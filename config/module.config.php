@@ -23,11 +23,8 @@ return [
         ],
     ],
     'form_elements' => [
-        'invokables' => [
-            Form\ConfigForm::class => Form\ConfigForm::class,
-        ],
         'factories' => [
-            Form\SiteSettingsFieldset::class => Service\Form\SiteSettingsFieldsetFactory::class,
+            'UniversalViewer\Form\ConfigForm' => Service\Form\ConfigFormFactory::class,
         ],
     ],
     'router' => [
@@ -87,6 +84,9 @@ return [
             'universalviewer_append_item_show' => true,
             'universalviewer_append_item_set_browse' => false,
             'universalviewer_append_item_browse' => false,
+            'universalviewer_class' => '',
+            'universalviewer_style' => 'background-color: #000; height: 600px;',
+            'universalviewer_locale' => 'en-GB:English (GB),fr:French',
         ],
     ],
 ];

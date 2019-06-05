@@ -37,6 +37,19 @@ use Zend\View\Helper\AbstractHelper;
 class UniversalViewer extends AbstractHelper
 {
     /**
+     * These options are used only when the player is called outside of a site
+     * or when the site settings are not set. They can be bypassed by options
+     * passed to the helper.
+     *
+     * @var array
+     */
+    protected $defaultOptions = [
+        'class' => '',
+        'style' => 'background-color: #000; height: 600px',
+        'locale' => 'en-GB:English (GB),fr:French',
+    ];
+
+    /**
      * @var Theme The current theme, if any
      */
     protected $currentTheme;
@@ -56,9 +69,13 @@ class UniversalViewer extends AbstractHelper
      *
      * Proxies to {@link render()}.
      *
-     * @param AbstractResourceEntityRepresentation|AbstractResourceEntityRepresentation[] $resource
-     * @param array $options
-     * @return string Html string corresponding to the viewer.
+     * @param AbstractResourceEntityRepresentation|array $resource
+     * @param array $options Associative array of optional values:
+     *   - (string) class
+     *   - (string) locale
+     *   - (string) style
+     *   - (string) config
+     * @return string. The html string corresponding to the UniversalViewer.
      */
     public function __invoke($resource, $options = [])
     {
@@ -86,7 +103,7 @@ class UniversalViewer extends AbstractHelper
                 ['force_canonical' => true]
             );
             $urlManifest = $view->iiifForceBaseUrlIfRequired($urlManifest);
-            return $this->render($urlManifest, $options, 'multiple');
+            return $this->render($urlManifest, $options);
         }
 
         // Prepare the url for the manifest of a record after additional checks.
@@ -103,7 +120,7 @@ class UniversalViewer extends AbstractHelper
             if ($urlManifest) {
                 // Manage the case where the url is saved as an uri or a text.
                 $urlManifest = $urlManifest->uri() ?: $urlManifest->value();
-                return $this->render($urlManifest, $options, $resourceName);
+                return $this->render($urlManifest, $options);
             }
         }
 
@@ -132,14 +149,13 @@ class UniversalViewer extends AbstractHelper
                 break;
         }
 
-        $urlManifest = $view->url(
-            $route,
+        $urlManifest = $view->url($route,
             ['id' => $resource->id()],
             ['force_canonical' => true]
         );
         $urlManifest = $view->iiifForceBaseUrlIfRequired($urlManifest);
 
-        return $this->render($urlManifest, $options, $resourceName);
+        return $this->render($urlManifest, $options);
     }
 
     /**
@@ -176,49 +192,56 @@ class UniversalViewer extends AbstractHelper
      *
      * @param string $urlManifest
      * @param array $options
-     * @param string $resourceName
-     * @return string Html code.
+     * @return string
      */
-    protected function render($urlManifest, array $options = [], $resourceName = null)
+    protected function render($urlManifest, $options = [])
     {
-        static $id = 0;
-
         $view = $this->view;
 
-        $view->headLink()
-            ->prependStylesheet($view->assetUrl('vendor/uv/uv.css', 'UniversalViewer'))
-            ->prependStylesheet($view->assetUrl('css/universal-viewer.css', 'UniversalViewer'));
-        $view->headScript()
-            ->appendFile($view->assetUrl('vendor/uv/lib/offline.js', 'UniversalViewer'))
-            ->appendFile($view->assetUrl('vendor/uv/helpers.js', 'UniversalViewer'))
-            ->appendFile($view->assetUrl('vendor/uv/uv.js', 'UniversalViewer'));
+        // Check site, because site settings aren’t available outside of a site.
+        $isSite = $view->params()->fromRoute('__SITE__');
+        if (empty($isSite)) {
+            $options += $this->defaultOptions;
+        }
 
-        $configUri = isset($options['config'])
+        $class = isset($options['class'])
+            ? $options['class']
+            : $view->siteSetting('universalviewer_class', $this->defaultOptions['class']);
+        if (!empty($class)) {
+            $class = ' ' . $class;
+        }
+
+        $style = isset($options['style'])
+            ? $options['style']
+            : $view->siteSetting('universalviewer_style', $this->defaultOptions['style']);
+        if (!empty($style)) {
+            $style = ' style="' . $style . '"';
+        }
+
+        $locale = isset($options['locale'])
+            ? $options['locale']
+            : $view->siteSetting('universalviewer_locale', $this->defaultOptions['locale']);
+        if (!empty($locale)) {
+            $locale = ' data-locale="' . $locale . '"';
+        }
+
+        $config = isset($options['config'])
             ? $this->basePath($options['config'])
             : $this->assetPath('universal-viewer/config.json', 'UniversalViewer');
 
-        $config = [
-            'id' => 'uv-' . ++$id,
-            'root' => $view->assetUrl('vendor/uv/', 'UniversalViewer', false, false),
-            'iiifResourceUri' => $urlManifest,
-            'configUri' => $configUri,
-            'embedded' => true,
-        ];
-
-        // $locale = $view->identity()
-        //     ? $view->userSetting('locale')
-        //     : ($view->params()->fromRoute('__SITE__')
-        //         ? $view->siteSetting('locale')
-        //         : ($view->setting('locale') ?: 'en-GB'));
-        $config['locales'] = [
-            ['name' => 'en-GB', 'label' => 'English'],
-        ];
-
-        $config += $options;
-
-        return $view->partial('common/helper/universal-viewer', [
-            'config' => $config,
-        ]);
+        $html = sprintf('<div class="uv%s" data-config="%s" data-uri="%s"%s%s></div>',
+            $class,
+            $config,
+            $urlManifest,
+            $locale,
+            $style);
+        $view->headScript()->appendFile(
+            $view->assetUrl('vendor/uv/lib/embed.js', 'UniversalViewer', false, false),
+            'application/javascript',
+            ['id' => 'embedUV']
+        );
+        $view->headScript()->appendScript('/* wordpress fix */', 'application/javascript');
+        return $html;
     }
 
     /**

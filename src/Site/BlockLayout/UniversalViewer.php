@@ -42,11 +42,8 @@ class UniversalViewer extends AbstractBlockLayout
         return 'Universal Viewer'; // @translate
     }
 
-    public function form(
-        PhpRenderer $view,
-        SiteRepresentation $site,
-        SitePageRepresentation $page = null,
-        SitePageBlockRepresentation $block = null
+    public function form(PhpRenderer $view, SiteRepresentation $site,
+        SitePageRepresentation $page = null, SitePageBlockRepresentation $block = null
     ) {
         return $view->blockAttachmentsForm($block);
     }
@@ -55,7 +52,7 @@ class UniversalViewer extends AbstractBlockLayout
     {
         $attachments = $block->attachments();
         if (!$attachments) {
-            return 'No resource selected'; // @translate
+            return 'No item selected'; // @translate
         }
 
         return $view->partial('common/block-layout/universal-viewer', [
